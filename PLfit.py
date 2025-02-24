@@ -12,16 +12,18 @@ def power_law(kappa, A, B):
     return A * kappa**B
 
 # Define range of kappa values
-kappa_vals = np.linspace(0.01, 30, 10000)  
+kappa_vals = np.linspace(0.01, 1e3, 10000000)  
 Pi0 = 1000  
 
 # Compute function values
 f_vals = f(kappa_vals, Pi0)
 
 # Plot the function
-plt.loglog(kappa_vals, f_vals, label=r'$f(\kappa)$')
+plt.loglog(kappa_vals, f_vals, label=r'$\Pi(\kappa)$')
 plt.xlabel(r'$\kappa$')
-plt.ylabel(r'$f(\kappa)$')
+plt.ylabel(r'$\Pi(\kappa)$')
+# plt.ylim(1e-6,5e7)
+
 # plt.title('Plot of the function')
 plt.legend()
 plt.grid()
@@ -45,7 +47,7 @@ plt.show()
 
 #%%
 # Select the range where you want to fit the power law
-fit_range = (kappa_vals > 0.2) & (kappa_vals < 2)  # Example range
+fit_range = (kappa_vals > 0.2) & (kappa_vals < 2)
 
 kappa_fit = kappa_vals[fit_range]
 f_fit = f_vals[fit_range]
@@ -79,12 +81,14 @@ kappa_range = (kappa_vals > 0.1) & (kappa_vals < 3)  # Example: choosing kappa i
 
 grad = power_law(kappa_vals[kappa_range], A_fit, B_fit)
 # Plot the function
-plt.loglog(kappa_vals, f_vals, label=r'$f(\kappa)$')
-plt.loglog(kappa_vals[kappa_range], grad, label = r'Power-Law Fit: $A \kappa^B$' )
+plt.loglog(kappa_vals, f_vals, 'black',label=r'$\Pi(\kappa)$')
+plt.loglog(kappa_vals[kappa_range], grad,'--r' ,label = r'Power-Law Fit: $A \kappa^B$' )
 plt.xlabel(r'$\kappa$')
-plt.ylabel(r'$f(\kappa)$')
+plt.ylabel(r'$\Pi(\kappa)$')
 plt.legend()
 plt.grid()
+plt.grid(True, which='major', linestyle='--', linewidth=0.4, alpha=0.7) 
+# plt.ylim(1e-4,5e7)
 plt.savefig('/Users/alisha/Documents/Magnetogenesis/Plots/fittedPL.png', bbox_inches='tight')
 
 plt.show()
