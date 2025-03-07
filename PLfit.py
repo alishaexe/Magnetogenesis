@@ -92,3 +92,5 @@ plt.grid(True, which='major', linestyle='--', linewidth=0.4, alpha=0.7)
 plt.savefig('/Users/alisha/Documents/Magnetogenesis/Plots/fittedPL.png', bbox_inches='tight')
 
 plt.show()
+#%%
+def test()
