@@ -12,7 +12,7 @@ def power_law(kappa, A, B):
     return A * kappa**B
 
 # Define range of kappa values
-kappa_vals = np.linspace(0.01, 1e3, 10000000)  
+kappa_vals = np.linspace(0.01, 1e2, 1000000)  
 Pi0 = 1000  
 
 # Compute function values
@@ -77,7 +77,7 @@ plt.grid()
 plt.show()
 
 #%%
-kappa_range = (kappa_vals > 0.1) & (kappa_vals < 3)  # Example: choosing kappa in [2, 5]
+kappa_range = (kappa_vals > 0.15) & (kappa_vals < 2.5)  # Example: choosing kappa in [2, 5]
 
 grad = power_law(kappa_vals[kappa_range], A_fit, B_fit)
 # Plot the function
@@ -93,4 +93,3 @@ plt.savefig('/Users/alisha/Documents/Magnetogenesis/Plots/fittedPL.png', bbox_in
 
 plt.show()
 #%%
-def test()
