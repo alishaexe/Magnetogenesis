@@ -35,7 +35,7 @@ def C0(t,s):
     t2 = 4*s**3*t*(t+1)*(t+2)
     t3 = 2*s**2*(t-2)*(t*(t+4)+2)
     tdenom = (s**2-(t+1)**2)**2
-    if abs(tdenom)<1e-3:
+    if abs(tdenom)<1e-4:
         return 0
     
     t4 = -(4*s*t*(t+1)*(t+2)+(t*(t+2)+2)**2)
@@ -44,14 +44,15 @@ def C0(t,s):
 def Si(x):
     # integrand = lambda xb: np.sin(xb)/xb
     # res = quad(integrand, 0, x)[0]
-    res = sici(x)
-    return res[0]
+    res = sici(x)[0]
+    return res
 
 def Ci(x):
     # integrand = lambda xb: np.cos(xb)/xb
     # res = -quad(integrand, x, np.inf)[0]
-    res = sici(x)
-    return res[1]
+    res = sici(x)[1]
+    
+    return res
 
 
 # def PB(k):
@@ -104,7 +105,7 @@ def PB238(k):
     # if kappa >1e3:
     #     f=0
     a = 1000 #Smoothness parameter
-    cutoff = 1 #/ (1 + np.exp(a * (kappa - 1e3)))
+    cutoff = 1 / (1 + np.exp(a * (kappa - 1000)))
     
     term1 = (1+ 2*Pi0*(kappa**3+(4*kappa**2-3)*np.sin(2*kappa)-(kappa*2-6)*kappa*np.cos(2*kappa))/kappa**3)*cutoff 
     term2 = ((4*(kappa**2+1)*Pi0**2*((kappa**2-3)*np.sin(kappa)+3*kappa*np.cos(kappa))**2)/kappa**6)*cutoff
@@ -123,7 +124,8 @@ def Iuv(k):
 
 def IuvPB238(k):
     f = lambda s, t: (1-s+t)*(1+s+t)*PB238(k*((t+s+1)/2))*PB238(k*((t-s+1)/2))*C0(t,s)
-    res = dblquad(f,0,np.inf,-1,1)[0]
+    # res = dblquad(f,0,np.inf,-1,1)[0]
+    res = dblquad(f, 0, 250, lambda t: -1, lambda t: 1,epsabs=1e-5, epsrel=1e-4)[0]
     return 1/8*res
 
 
