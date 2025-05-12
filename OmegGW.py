@@ -1,13 +1,15 @@
 import matplotlib.pyplot as plt
+import time
 import numpy as np
 from scipy.integrate import quad, dblquad
+from scipy.special import sici, exp1
 #%%
 HI = 1e-6
-TR=-1e6
+TR=-0.01
 pi = np.pi
-alpha = 1.05E7
-Delta_tau = 0.0013
-Pi0 = 10
+alpha = 1e7
+Delta_tau = 1e-1
+# Pi0 = 1e6
 kstar = 1000
 #%%
 
@@ -21,22 +23,35 @@ kstar = 1000
 #     res = term1+term2+term3
 #     return res
 
+# def C0(t,s):
+#     term1 = s**4*(t*(t+2)+2)**2
+#     term2 = 2*s**2*(t-2)*(t*(t+4)+2)
+#     term3 = (t*(t+2)+2)**2
+#     term4 = (s**2-(t+1)**2)**2
+#     return 2*(term1+term2+term3)/term4
+
 def C0(t,s):
-    term1 = s**4*(t*(t+2)+2)**2
-    term2 = 2*s**2*(t-2)*(t*(t+4)+2)
-    term3 = (t*(t+2)+2)**2
-    term4 = (s**2-(t+1)**2)**2
-    return 2*(term1+term2+term3)/term4
+    t1 = s**4*(t*(t+2)+2)**2
+    t2 = 4*s**3*t*(t+1)*(t+2)
+    t3 = 2*s**2*(t-2)*(t*(t+4)+2)
+    tdenom = (s**2-(t+1)**2)**2
+    if abs(tdenom)<1e-3:
+        return 0
+    
+    t4 = -(4*s*t*(t+1)*(t+2)+(t*(t+2)+2)**2)
+    return (t1+t2+t3)/tdenom+t4/tdenom
 
 def Si(x):
-    integrand = lambda xb: np.sin(xb)/xb
-    res = quad(integrand, 0, x)[0]
-    return res
+    # integrand = lambda xb: np.sin(xb)/xb
+    # res = quad(integrand, 0, x)[0]
+    res = sici(x)
+    return res[0]
 
 def Ci(x):
-    integrand = lambda xb: np.cos(xb)/xb
-    res = -quad(integrand, x, np.inf)[0]
-    return res
+    # integrand = lambda xb: np.cos(xb)/xb
+    # res = -quad(integrand, x, np.inf)[0]
+    res = sici(x)
+    return res[1]
 
 
 # def PB(k):
@@ -83,10 +98,19 @@ def PB(k):
 
 def PB238(k):
     kappa = k/kstar
-    term1 = 1+ 2*Pi0*(kappa**3+(4*kappa**2-3)*np.sin(2*kappa)-(kappa*2-6)*kappa*np.cos(2*kappa))/kappa**3
-    term2 = (4*(kappa**2+1)*Pi0**2*((kappa**2-3)*np.sin(kappa)+3*kappa*np.cos(kappa))**2)/kappa**6
-    return (term1+term2)* (9*HI**4)/(4*pi**2)
     
+    # if kappa <= 1e3:
+    #     f = 1
+    # if kappa >1e3:
+    #     f=0
+    a = 1000 #Smoothness parameter
+    cutoff = 1 #/ (1 + np.exp(a * (kappa - 1e3)))
+    
+    term1 = (1+ 2*Pi0*(kappa**3+(4*kappa**2-3)*np.sin(2*kappa)-(kappa*2-6)*kappa*np.cos(2*kappa))/kappa**3)*cutoff 
+    term2 = ((4*(kappa**2+1)*Pi0**2*((kappa**2-3)*np.sin(kappa)+3*kappa*np.cos(kappa))**2)/kappa**6)*cutoff
+    return (term1+term2)*(9*HI**4)/(4*pi**2) #Pi0 = Pb/pb(k<<1)
+                                            #So Pb = Pi0*Pb(k<<1)
+                                                                                                    
 def Iuv(k):
     f = lambda s, t: (1-s+t)*(1+s+t)*PB(k*((t+s+1)/2))*PB(k*((t-s+1)/2))*C0(t,s)
     res = dblquad(f,0,np.inf,-1,1)[0]
@@ -104,47 +128,67 @@ def IuvPB238(k):
 
 
 def OmegGW(k):
-    t1 = (HI**4*(-k*TR)**8)/(24576*pi**6)
+    # t1 = (HI**4*(-k*TR)**8)/(24576*pi**6)
     t2 = Ci(-k*TR)**2+(pi/2+Si(-k*TR))**2
-    return t1*t2*Iuv(k)
+    return t2*Iuv(k)
 
 def OmegGWpb238(k):
-    t1 = (HI**4*(-k*TR)**8)/(24576*pi**6)
+    # t1 = (HI**4*(-k*TR)**8)/(24576*pi**6)
     t2 = Ci(-k*TR)**2+(pi/2+Si(-k*TR))**2
-    return t1*t2*IuvPB238(k)
-
-k_vals = np.logspace(0,3,1000)
-hope = np.abs(np.array(list(map(OmegGW, k_vals))))
+    return t2*IuvPB238(k)
+start = time.time()
+Pi0 = 1e6
+k_vals = np.logspace(-2,6,1000)
+# hope = np.abs(np.array(list(map(OmegGW, k_vals))))
 prayer = np.abs(np.array(list(map(OmegGWpb238, k_vals))))
+
+# bill_pb = np.abs(np.array(list(map(OmegGW, k_vals))))
+end = time.time()
+print("Calculation Time:", end-start)
 #%%
-plt.loglog(k_vals, hope, color = 'black', label="General PB")
 plt.loglog(k_vals, prayer ,label = "PB238")
-# plt.loglog(k_vals, 2e3*prayer,'--', label = "pow3*2e3")
+# plt.loglog(k_vals, np.abs(prayer) ,label = "abs PB238")
+# plt.loglog(k_vals, bill_pb ,label = "Bill Pb")
+
 # plt.xlim(1e-3,1e-1)
 plt.xlabel(r"$\kappa$", size = 14)
 plt.legend()
 plt.ylabel(r"$\Omega_{GW}$", size = 16)
 plt.grid(True, which='major', linestyle='--', linewidth=0.4, alpha=0.7) 
-plt.title("kstar = 1000, Pi0 = 10")
+plt.title(r"Python: kstar = 1000, $\Pi_0$ = 1e6, $\tau_R$=-0.01")
 # plt.ylim(top = 10**5)
-# plt.savefig('/Users/alisha/Documents/Magnetogenesis/Plots/OmegGW.png', bbox_inches='tight')
+# plt.savefig('/Users/alisha/Documents/Magnetogenesis/Plots/OmegGW_C0v2_Pi0_1e6.png', bbox_inches='tight')
 
 plt.show()
 
 #%%
-pbgen = np.abs(np.array(list(map(PB, k_vals))))
-pb238 = np.array(list(map(PB238, k_vals)))
+
+Pi0 = 10
+hope = np.abs(np.array(list(map(OmegGWpb238, k_vals))))
+
+
 #%%
-# plt.loglog(k_vals, pbgen, color = 'black', label="General PB")
-plt.loglog(k_vals, pb238 ,label = "PB238")
-# plt.loglog(k_vals, 2e3*prayer,'--', label = "pow3*2e3")
+plt.loglog(k_vals, hope, label="PB238")
 # plt.xlim(1e-3,1e-1)
 plt.xlabel(r"$\kappa$", size = 14)
 plt.legend()
-plt.ylabel(r"$P_B$", size = 16)
+plt.ylabel(r"$\Omega_{GW}$", size = 16)
 plt.grid(True, which='major', linestyle='--', linewidth=0.4, alpha=0.7) 
-# plt.title("now added kappa = k/kstar, kstar = 1000")
+plt.title(r"kstar = 1000, $\Pi_0$ = 10, $\tau_R$=-0.01")
 # plt.ylim(top = 10**5)
-# plt.savefig('/Users/alisha/Documents/Magnetogenesis/Plots/OmegGW.png', bbox_inches='tight')
+plt.savefig('/Users/alisha/Documents/Magnetogenesis/Plots/OmegGW_C0v2_Pi0_10.png', bbox_inches='tight')
+
+plt.show()
+
+#%%
+plt.loglog(k_vals, prayer ,label = r"$\Pi_0$=1e6")
+plt.loglog(k_vals, hope, label=r"$\Pi_0$=10")
+plt.xlabel(r"$\kappa$", size = 14)
+plt.legend()
+plt.ylabel(r"$\Omega_{GW}$", size = 16)
+plt.grid(True, which='major', linestyle='--', linewidth=0.4, alpha=0.7) 
+plt.title(r"Python numerics: kstar = 1000, $\tau_R$=-0.01")
+# plt.ylim(top = 10**5)
+plt.savefig('/Users/alisha/Documents/Magnetogenesis/Plots/OmegGW_C0v2_Pi0_comp.png', bbox_inches='tight')
 
 plt.show()
