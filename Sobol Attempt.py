@@ -7,6 +7,12 @@ from jax import jit, vmap, lax
 from scipy.stats import qmc
 from scipy import constants
 import time
+from scipy.stats import linregress
+from scipy.special import sici
+
+
+jax.config.update("jax_enable_x64", True)
+
 #%%
 HI = 1e-6
 TR=-0.01
@@ -27,8 +33,11 @@ def C0(t,s):
     t2num = (s**2+t*(t+2)+3)**2
     t2denom = 4*(s+t+1)**2
     
-    t1 = (t1num/t1denom)+1
-    t2 = (t2num/t2denom)+1
+    t1 = lax.cond(t1denom<1e-4, lambda _:1.0, lambda _: (t1num/t1denom)+1, operand = None)
+    t2 = lax.cond(t2denom<1e-4, lambda _:1.0, lambda _: (t2num/t2denom)+1, operand = None)
+    
+    # t1 = (t1num/t1denom)+1
+    # t2 = (t2num/t2denom)+1
 
     return t1*t2
 
@@ -50,61 +59,73 @@ def C0(t,s):
 #     t2 = t2num/t2denom
 #     return 1 + t1 + t2
 
-def Si(x):    
-    num_samples = 1000
-    sampler = qmc.Sobol(d=1, scramble=True, seed = 42)
-    raw_samples = sampler.random(num_samples)
+# def Si(x):    
+#     num_samples = 100
+#     sampler = qmc.Sobol(d=1, scramble=True, seed = 42)
+#     raw_samples = sampler.random(num_samples)
     
-    l_bounds = [0]
-    u_bounds = [x]
-    samples = qmc.scale(raw_samples, l_bounds, u_bounds)
-    samples = jnp.array(samples)
+#     l_bounds = [0]
+#     u_bounds = [x]
+#     samples = qmc.scale(raw_samples, l_bounds, u_bounds)
+#     samples = jnp.array(samples)
     
-    f = lambda xb: jnp.sin(xb)/xb
-    intvals = vmap(f)(samples)
-    volume = jnp.prod(jnp.array(u_bounds) - jnp.array(l_bounds))
-    integral = jnp.mean(intvals) * volume
-    # jax.debug.print("SI:{}", integral)
-    return integral
+#     f = lambda xb: jnp.sin(xb)/xb
+#     intvals = vmap(f)(samples)
+#     volume = jnp.prod(jnp.array(u_bounds) - jnp.array(l_bounds))
+#     integral = jnp.mean(intvals) * volume
+#     # jax.debug.print("SI:{}", integral)
+#     return integral
 
 
-# I use the definition for Ci from wikipedia where it's: gamma+ln x-Cin(x). Where Cin(x)=int 0-> x (1-cost)/t dt
+# # I use the definition for Ci from wikipedia where it's: gamma+ln x-Cin(x). Where Cin(x)=int 0-> x (1-cost)/t dt
+# def Ci(x):
+#     num_samples = 100
+#     sampler = qmc.Sobol(d=1, scramble=True, seed = 42)
+#     raw_samples = sampler.random(num_samples)
+    
+#     l_bounds = [0]
+#     u_bounds = [x]
+#     samples = qmc.scale(raw_samples, l_bounds, u_bounds)
+#     samples = jnp.array(samples)
+    
+#     f = lambda xb: - (1-jnp.cos(xb))/xb
+#     intvals = vmap(f)(samples)
+#     volume = jnp.prod(jnp.array(u_bounds) - jnp.array(l_bounds))
+#     integral = jnp.mean(intvals) * volume
+    
+#     # jax.debug.print("CI:{}", integral)
+#     return jnp.euler_gamma + jnp.log(x) +integral
+
+def Si(x):
+    # integrand = lambda xb: np.sin(xb)/xb
+    # res = quad(integrand, 0, x)[0]
+    res = sici(x)[0]
+    return res
+
 def Ci(x):
-    num_samples = 1000
-    sampler = qmc.Sobol(d=1, scramble=True, seed = 42)
-    raw_samples = sampler.random(num_samples)
+    # integrand = lambda xb: np.cos(xb)/xb
+    # res = -quad(integrand, x, np.inf)[0]
+    res = sici(x)[1]
     
-    l_bounds = [0]
-    u_bounds = [x]
-    samples = qmc.scale(raw_samples, l_bounds, u_bounds)
-    samples = jnp.array(samples)
-    
-    f = lambda xb: - (1-jnp.cos(xb))/xb
-    intvals = vmap(f)(samples)
-    volume = jnp.prod(jnp.array(u_bounds) - jnp.array(l_bounds))
-    integral = jnp.mean(intvals) * volume
-    
-    # jax.debug.print("CI:{}", integral)
-    return jnp.euler_gamma + jnp.log(x) +integral
-
+    return res
 
 @jit
 def PB(k):
     pb = 1 +2/k**3 * Pi0*(k**3+(4*k**2-3)*jnp.sin(2*k)-(k**2-6)*k*jnp.cos(2*k))+4/k**6*Pi0**2*(k**2+1)*((k**2-3)*jnp.sin(k)+3*k*jnp.cos(k))**2
     res = lax.cond(k>=50, lambda _:0.0, lambda _: pb, operand = None)
-    return res/(1+0.01*k**8)
+    return res#/(1+0.01*k**8)
                                                        
 
 
 @jit
 def IuvPB238(args, k):
     s, t = args
-    f = lambda s, t: 1/(1-s+t)**2*1/(1+s+t)**2*PB(k*((t+s+1)/2))*PB(k*((t-s+1)/2))*C0(t,s)
-    return 1/8*f(s,t)
+    f = lambda s, t: 1/(1-s+t)**2*1/(1+s+t)**2*PB(k*((t+s+1)/2))*PB(k*((t-s+1)/2))*(-C0(t,s))
+    return f(s,t)
 
 
 
-def OmegaGW_qmc(k, num_samples=800000):
+def OmegaGW_qmc(k, num_samples=300000):
     sampler = qmc.Sobol(d=2, scramble=True, seed = 42)
     raw_samples = sampler.random(num_samples)
     
@@ -117,23 +138,26 @@ def OmegaGW_qmc(k, num_samples=800000):
     volume = jnp.prod(jnp.array(u_bounds) - jnp.array(l_bounds))
     integral = jnp.mean(intvals) * volume
     
-    # t1 = pi/384 * ((9*HI**4)/(4*pi**2*mpl**4))*HI**4*TR**8*mpl**4
+    t1 = pi/384 * ((9*HI**4)/(4*pi**2*mpl**4))**2*(HI**4*TR**8*mpl**4)/96
     t2 = (Ci(k*xstar)**2+(pi/2+Si(k*xstar))**2)
     # jax.debug.print("t2:{}", t2)
 
-    return t2*integral
+    return t1*t2*integral
+
 Pi0 = 1e6
 xstar = 1e-3
 
-k_vals = jnp.logspace(-5,1.7,1000)
+k_vals = jnp.logspace(-5,2.2,1000)
 # k_vals = jnp.linspace(1e-2,1e4,1000)
 # Omeg = vmap(OmegaGW_qmc)(k_vals)
 Omeg = jnp.abs(jnp.array(list(map(OmegaGW_qmc, k_vals))))
 end = time.time()
 print("Calculation Time:", end-start)
-#%%
-plt.loglog(k_vals, Omeg)
 
+#%%
+
+
+plt.loglog(k_vals, Omeg)
 
 # plt.xlim(1e-3,10)
 plt.xlabel(r"$\kappa$", size = 14)
@@ -142,9 +166,27 @@ plt.ylabel(r"$\Omega_{GW}$", size = 16)
 plt.grid(True, which='both', linestyle='--', linewidth=0.4, alpha=0.7) 
 # plt.title(r"QMC Sobol: kstar = 1000, $\Pi_0$ = 1e6, $x_\star$=1e-3")
 # plt.ylim(1e5, 1e25)
-plt.savefig('/Users/alisha/Documents/Magnetogenesis/Plots/SobolOmegGW_newc0.png', bbox_inches='tight')
+# plt.savefig('/Users/alisha/Documents/Magnetogenesis/Plots/SobolOmegGW_newc0.png', bbox_inches='tight')
 
 plt.show()
+#%%
+lim = 1.5e-3
+x = k_vals[k_vals<lim]
+y = Omeg[k_vals<lim]
+slope, intercept, r_value, p_value, std_err = linregress(np.log10(x), np.log10(y))
+y_fit = 10**intercept* x**slope
+x = k_vals
+y = Omeg
+
+# plt.scatter(x, y, label='Data')
+# plt.plot(x, y_fit, color='red', label='Linear fit')
+# plt.yscale('log')
+# plt.xscale('log')
+# plt.legend()
+# plt.show()
+
+# Omeg = Omeg.at[k_vals<lim].set( y_fit)
+
 
 #%%
 from scipy.optimize import curve_fit
@@ -153,7 +195,7 @@ def power_law(kappa, A, B):
     # return A * kappa**B
     return  np.log(A)+B*np.log(kappa)
 # Select the range where you want to fit the power law
-fit_range = (k_vals > 3e-2) & (k_vals < 1e-1)
+fit_range = (k_vals > 3e-3) & (k_vals < 1e-1)
 
 kappa_fit = k_vals[fit_range]
 Omeg_fit = np.log(Omeg[fit_range])
@@ -188,11 +230,11 @@ plt.grid()
 plt.show()
 #%%
 def power_law(kappa, A, B):
-    # return A * kappa**B
-    return  np.log(A)+B*np.log(kappa)
+    return A * kappa**B
+    # return  np.log(A)+B*np.log(kappa)
 
 # Select the range where you want to fit the power law
-fit_range = (k_vals > 2e-1) & (k_vals < 2e1)
+fit_range = (k_vals > 3e-1) & (k_vals < 1)
 
 kappa_fit = k_vals[fit_range]
 Omeg_fit = np.log(Omeg[fit_range])
@@ -218,7 +260,7 @@ plt.xlabel(r'$\kappa$')
 plt.ylabel(r"$\Omega_{GW}$", size = 16)
 plt.title(f'Fitted Power-Law: A = {A_fit:.4e}, B = {B_fit:.4f}')
 plt.legend()
-plt.grid()
+plt.grid(True, which='both', linestyle='--', linewidth=0.4, alpha=0.7) 
 # plt.savefig('/Users/alisha/Documents/Magnetogenesis/Plots/Powerlaw fits2.png', bbox_inches='tight')
 
 plt.show()

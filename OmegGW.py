@@ -60,17 +60,17 @@ def Ci(x):
 
 
 def PB238(k):
-    if k>1/xstar:
+    if k>50:
         return 0
     else:
         res = 1 +2/k**3 * Pi0*(k**3+(4*k**2-3)*np.sin(2*k)-(k**2-6)*k*np.cos(2*k))+4/k**6*Pi0**2*(k**2+1)*((k**2-3)*np.sin(k)+3*k*np.cos(k))**2
-        return res/(1+0.01*k**8)                                                                        
+        return res#/(1+0.01*k**8)                                                                        
 
 def IuvPB238(k):
     f = lambda s, t: 1/(1-s+t)**2*1/(1+s+t)**2*PB238(k*((t+s+1)/2))*PB238(k*((t-s+1)/2))*C0(t,s)
     # res = dblquad(f,0,np.inf,-1,1)[0]
     res = dblquad(f, 0, np.inf, -1, 1,epsabs=1e-5, epsrel=1e-4)[0]
-    return 1/8*res
+    return res
 
 
 
