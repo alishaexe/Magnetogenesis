@@ -3,17 +3,17 @@ import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 
 #%%
-def f(kappa, Pi0):
-    term1 = 1 + (1 / kappa**6) * 4 * (1 + kappa**2) * Pi0**2 * (3 * kappa * np.cos(kappa) + (-3 + kappa**2) * np.sin(kappa))**2
-    term2 = (1 / kappa**3) * 2 * Pi0 * (kappa**3 - kappa * (-6 + kappa**2) * np.cos(2 * kappa) + (-3 + 4 * kappa**2) * np.sin(2 * kappa))
-    return term1 + term2
+def f(k, Pi0):
+    t1 = 1 +2/k**3 * Pi0*(k**3+(4*k**2-3)*np.sin(2*k)-(k**2-6)*k*np.cos(2*k))+4/k**6*Pi0**2*(k**2+1)*((k**2-3)*np.sin(k)+3*k*np.cos(k))**2
+    return t1
 
 def power_law(kappa, A, B):
     return A * kappa**B
 
 # Define range of kappa values
-kappa_vals = np.linspace(0.01, 1e2, 1000000)  
-Pi0 = 1000  
+kappa_vals = np.linspace(1e-4, 20, 1000000)  
+# kappa_vals = 
+Pi0 = 1e6
 
 # Compute function values
 f_vals = f(kappa_vals, Pi0)
@@ -47,7 +47,7 @@ plt.show()
 
 #%%
 # Select the range where you want to fit the power law
-fit_range = (kappa_vals > 0.2) & (kappa_vals < 2)
+fit_range = (kappa_vals > 1e-2) & (kappa_vals < 1)
 
 kappa_fit = kappa_vals[fit_range]
 f_fit = f_vals[fit_range]
@@ -89,7 +89,21 @@ plt.legend()
 plt.grid()
 plt.grid(True, which='major', linestyle='--', linewidth=0.4, alpha=0.7) 
 # plt.ylim(1e-4,5e7)
-plt.savefig('/Users/alisha/Documents/Magnetogenesis/Plots/fittedPL.png', bbox_inches='tight')
+# plt.savefig('/Users/alisha/Documents/Magnetogenesis/Plots/fittedPL.png', bbox_inches='tight')
 
 plt.show()
 #%%
+fit_range = (kappa_vals > 4e-1) & (kappa_vals < 5)
+y = power_law(kappa_vals[fit_range], 5e10, 4.76)
+plt.loglog(kappa_vals, f_vals, 'black',label=r'$\Pi(\kappa)$')
+plt.loglog(kappa_vals[fit_range], y, 'red',linestyle='--')
+plt.xlabel(r'$\kappa$')
+plt.ylabel(r'$\Pi(\kappa)$')
+# plt.legend(loc='upper left')
+# plt.grid(True, which='both', linestyle='--', linewidth=0.4, alpha=0.7) 
+plt.grid(True, which='major', linestyle='--', linewidth=0.4, alpha=0.7) 
+
+# plt.ylim(1e-4,5e7)
+# plt.savefig('/Users/alisha/Documents/Magnetogenesis/Plots/fittedPL.png', bbox_inches='tight')
+
+plt.show()

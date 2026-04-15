@@ -15,13 +15,11 @@ jax.config.update("jax_enable_x64", True)
 
 #%%
 HI = 1e-6
-TR=-0.01
 pi = np.pi
-alpha = 1e7
-Delta_tau = 1e-1
 kstar = 1000
-mpl = constants.physical_constants["Planck mass"][0]
-aR = -1/(HI*TR)
+# Mpl = constants.physical_constants["Planck mass"][0]
+
+#IF WANT TO INCLUDE MPL THEN DO HI=1E-6/MPL AND THEN INCLUDE MPL IN PREFACTOR
 #%%
 start = time.time()
 
@@ -33,31 +31,20 @@ def C0(t,s):
     t2num = (s**2+t*(t+2)+3)**2
     t2denom = 4*(s+t+1)**2
     
-    t1 = lax.cond(t1denom<1e-4, lambda _:1.0, lambda _: (t1num/t1denom)+1, operand = None)
-    t2 = lax.cond(t2denom<1e-4, lambda _:1.0, lambda _: (t2num/t2denom)+1, operand = None)
+    # t1 = lax.cond(t1denom<1e-4, lambda _:1.0, lambda _: (t1num/t1denom)+1, operand = None)
+    # t2 = lax.cond(t2denom<1e-4, lambda _:1.0, lambda _: (t2num/t2denom)+1, operand = None)
     
-    # t1 = (t1num/t1denom)+1
-    # t2 = (t2num/t2denom)+1
+    t1 = (t1num/t1denom)+1
+    t2 = (t2num/t2denom)+1
 
     return t1*t2
 
-# @jit
-# def C0(t,s):
-#     t1num = (s**2+t*(t+2)+3)**2*(s**2+t*(t+2)-1)**2
-#     t1denom = 16*(-s+t+1)**2*(s+t+1)**2
-#     # if t1denom<1e-4:
-#     #     t1 = 0
-#     # else:
-#     #     t1 = t1num/t1denom
-#     t2num = (s**2+t*(t+2)-1)**2
-#     t2denom = 2*(-s+t+1)**2
-#     # if t2denom<1e-4:
-#     #     t2 = 0
-#     # else:
-#     #     t2 = t2num/t2denom
-#     t1 = t1num/t1denom
-#     t2 = t2num/t2denom
-#     return 1 + t1 + t2
+
+def Si(x):
+    # integrand = lambda xb: np.sin(xb)/xb
+    # res = quad(integrand, 0, x)[0]
+    res = sici(x)[0]
+    return res
 
 # def Si(x):    
 #     num_samples = 100
@@ -76,8 +63,13 @@ def C0(t,s):
 #     # jax.debug.print("SI:{}", integral)
 #     return integral
 
+def Ci(x):
+    # integrand = lambda xb: np.cos(xb)/xb
+    # res = -quad(integrand, x, np.inf)[0]
+    res = sici(x)[1]
+    
+    return res
 
-# # I use the definition for Ci from wikipedia where it's: gamma+ln x-Cin(x). Where Cin(x)=int 0-> x (1-cost)/t dt
 # def Ci(x):
 #     num_samples = 100
 #     sampler = qmc.Sobol(d=1, scramble=True, seed = 42)
@@ -96,24 +88,11 @@ def C0(t,s):
 #     # jax.debug.print("CI:{}", integral)
 #     return jnp.euler_gamma + jnp.log(x) +integral
 
-def Si(x):
-    # integrand = lambda xb: np.sin(xb)/xb
-    # res = quad(integrand, 0, x)[0]
-    res = sici(x)[0]
-    return res
-
-def Ci(x):
-    # integrand = lambda xb: np.cos(xb)/xb
-    # res = -quad(integrand, x, np.inf)[0]
-    res = sici(x)[1]
-    
-    return res
-
 @jit
 def PB(k):
     pb = 1 +2/k**3 * Pi0*(k**3+(4*k**2-3)*jnp.sin(2*k)-(k**2-6)*k*jnp.cos(2*k))+4/k**6*Pi0**2*(k**2+1)*((k**2-3)*jnp.sin(k)+3*k*jnp.cos(k))**2
     res = lax.cond(k>=50, lambda _:0.0, lambda _: pb, operand = None)
-    return res#/(1+0.01*k**8)
+    return res
                                                        
 
 
@@ -130,7 +109,7 @@ def OmegaGW_qmc(k, num_samples=300000):
     raw_samples = sampler.random(num_samples)
     
     l_bounds = [-1, 0]
-    u_bounds = [1, 30]
+    u_bounds = [1, 10]
     samples = qmc.scale(raw_samples, l_bounds, u_bounds)
     samples = jnp.array(samples)
     
@@ -138,16 +117,17 @@ def OmegaGW_qmc(k, num_samples=300000):
     volume = jnp.prod(jnp.array(u_bounds) - jnp.array(l_bounds))
     integral = jnp.mean(intvals) * volume
     
-    t1 = pi/384 * ((9*HI**4)/(4*pi**2*mpl**4))**2*(HI**4*TR**8*mpl**4)/96
-    t2 = (Ci(k*xstar)**2+(pi/2+Si(k*xstar))**2)
+    t1 = ((9*HI**4)/(32*pi**2))**2 * 1/(3*omegrd)
+    t2 = (Ci(k*xstar)**2+(pi/2-Si(k*xstar))**2)
     # jax.debug.print("t2:{}", t2)
 
     return t1*t2*integral
 
-Pi0 = 1e6
-xstar = 1e-3
+omegrd = 6.6e-5*0.68**(-2)
+Pi0 = 7e7
+xstar = 1e-4
 
-k_vals = jnp.logspace(-5,2.2,1000)
+k_vals = jnp.logspace(jnp.log10(1e-1), jnp.log10(90), 1000)
 # k_vals = jnp.linspace(1e-2,1e4,1000)
 # Omeg = vmap(OmegaGW_qmc)(k_vals)
 Omeg = jnp.abs(jnp.array(list(map(OmegaGW_qmc, k_vals))))
@@ -166,7 +146,7 @@ plt.ylabel(r"$\Omega_{GW}$", size = 16)
 plt.grid(True, which='both', linestyle='--', linewidth=0.4, alpha=0.7) 
 # plt.title(r"QMC Sobol: kstar = 1000, $\Pi_0$ = 1e6, $x_\star$=1e-3")
 # plt.ylim(1e5, 1e25)
-# plt.savefig('/Users/alisha/Documents/Magnetogenesis/Plots/SobolOmegGW_newc0.png', bbox_inches='tight')
+# plt.savefig('/Users/alisha/Documents/Magnetogenesis/Plots/SobolOmegGW.png', bbox_inches='tight')
 
 plt.show()
 #%%
